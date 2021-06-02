@@ -1,8 +1,29 @@
 #!/bin/bash
+PID_LIST=()
+
+function check_threads() {
+    running_th=0;
+    for i in "${!PID_LIST[@]}";
+    do
+        # Check if the currently processed thread is running
+        output=$(ps -p "${PID_LIST[i]}")
+        # If not, remove it
+        if [ $? -ne 0 ]; then
+            echo "Thread ${PID_LIST[i]} was stopped"
+            unset 'PID_LIST[i]';
+		else 
+		# If it's still running, add it to the counter
+			running_th=$((running_th + 1));
+        fi
+    done
+	# Return the number of running threads.
+    return $running_th
+}
+
 # Intercepts the SIGINT signal
 function ctrl_c() {
 	# Retrieve the list of process id-s that was passed as argument
-	PID_LIST=("$@");
+#	PID_LIST=("$@");
 	echo
 	echo "SIGINT Intercepted"
 	echo "Killing threads:"
@@ -45,12 +66,14 @@ Help
 # Take the command line arguments. Their description is given in Help() 
 path=$1;
 out_folder=$2;
-bitrate=$3;
-crop_pat=$4;
+v_bitrate=$3;
+a_bitrate=$4
+crop_pat=$5;
 
 # $counter counts the number of threads started from the beggining of the 
 # execution. The counter is zero-based.
 counter=0;
+finished=0;
 # Declare the maximum number of parallel threads to be run at a time
 max_threads=3;
 
@@ -86,7 +109,8 @@ if [[ -d $path ]]; then
 			-i '$in_path' \
 			-c:a copy \
 			-c:v h264_nvenc \
-			-b:v $bitrate \
+			-b:v $v_bitrate \
+			-b:a $a_bitrate \
 			'$out_path'";
 			# Display the command
 			echo "Command is:"
@@ -95,45 +119,39 @@ if [[ -d $path ]]; then
 			# id of the process
 			eval $command & pid=$!;
 			# Debug-only
-			#sleep 2s & pid=$!;
+#			sleep ${counter}s & pid=$!;
 			# Display a message to the terminal
 			echo "Started thread number ${counter}";
-			echo "Thread id is:"
-			echo $pid;
+			echo "Thread id is: $pid"
 			# Add the process to the list of active processes
-			PID_LIST+=" $pid";
+			PID_LIST+=("$pid");
 			# Increment the thread counter. It keeps the total 
 			# number of threads ran up until the current moment
 			counter=$((counter + 1));
 			# Trap SIGINT and send it to the function that hanles
 			# interruptions, together with the PID_LIST array
-			trap "ctrl_c ${PID_LIST[@]}" SIGINT
-			# Limit the number of currently running threads to 
-			# $max_threads.
-			if [ $(($counter % $max_threads)) -eq 0 ]; then
-				echo "Waiting for threads to complete"
-				wait $PID_LIST;
-				echo "Finished $max_threads threads"
-			# Empty the list of threads after they have completed
-				PID_LIST="";
-			fi
+			trap 'ctrl_c' SIGINT
+			# Check the number of currently running threads
+			check_threads;
+			running_threads=$?
+			echo
+			echo "$running_threads threads running"
+			# If we have more threads than the maximum value, we
+			# will wait for one thread to terminate, before 
+			# starting another one. The check interval is 3s.
+			while [ "$running_threads" -ge "$max_threads" ] 
+			do	
+				check_threads;
+				running_threads=$?
+				sleep 3s;
+			done
 		fi
 	done
-	# If the threads initialized were not a multiple of $max_threads
-	# there have remained some threads that we did not wait for. We must
-	# wait for them to complete.
-	if [ $(($counter % $max_threads)) -ne 0 ]; then
-		echo "Waiting for threads to complete"
-		wait $PID_LIST;
-		echo "Finished $(($counter % $max_threads)) threads"
-		PID_LIST="";
-	fi
-
+	# After leaving the loop, we still have $max_threads-1 threads
+	# running. We must wait for those threads too.
+	echo "Waiting for threads to complete"
+	wait $PID_LIST;
+	echo "Finished $(($counter % $max_threads)) threads"
 fi
-
-trap "kill $PID_LIST" SIGINT
-echo "";
-#echo "Output path is $destination";
-
 
 
