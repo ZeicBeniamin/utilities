@@ -43,17 +43,20 @@ function Help()
 	echo "Convert files in folder to mp4 videos with specified parameters"
 	echo 
 	echo "Syntax:"
-	echo "video_conv2 <path_to_folder> <output_folder> <bitrate> <crop>"
+	echo "video_conv2 		<path_to_folder> <output_folder> <v_bitrate> "
+	echo "					<a_bitrate> <crop> <fps>"
 	echo 
 	echo "path_to_folder	Path to the folder that contains the video files"
 	echo "output_folder 	Name of folder that will store output files"
-	echo "			This folder is contained within the one"
-	echo "			specified in path_to_folder"
-	echo "bitrate		Bitrate of the converted video. Read the"
-	echo "			ffmpeg documentation to find out the valid"
-	echo "			formats for the bitrate."
-	echo "crop		Specifies the crop pattern for the video."
-	echo "			Pattern is  (crop(top)x(bottom)x(left)x(right))"
+	echo "					This folder is contained within the one"
+	echo "					specified in path_to_folder"
+	echo "v_bitrate			Bitrate of the converted video. Read the"
+	echo "					ffmpeg documentation to find out the valid"
+	echo "					formats for the bitrate."
+	echo "a_bitrate			Bitrate of the audio track of the video"
+	echo "crop				Specifies the crop pattern for the video."
+	echo "					Pattern is  (crop(top)x(bottom)x(left)x(right))"
+	echo "fps				Frame rate of the output"
 	echo
 }
 
@@ -69,6 +72,7 @@ out_folder=$2;
 v_bitrate=$3;
 a_bitrate=$4
 crop_pat=$5;
+fps=$6;
 
 # $counter counts the number of threads started from the beggining of the 
 # execution. The counter is zero-based.
@@ -107,10 +111,12 @@ if [[ -d $path ]]; then
 			-c:v h264_cuvid \
 			-crop $crop_pat \
 			-i '$in_path' \
+			-filter:v fps=$fps \
 			-c:a copy \
 			-c:v h264_nvenc \
 			-b:v $v_bitrate \
 			-b:a $a_bitrate \
+			-rc-lookahead 20 \
 			'$out_path'";
 			# Display the command
 			echo "Command is:"
