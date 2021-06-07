@@ -57,7 +57,8 @@ function Help()
 	echo "crop				Specifies the crop pattern for the video."
 	echo "					Pattern is  (crop(top)x(bottom)x(left)x(right))"
 	echo "fps				Frame rate of the output"
-	echo
+	echo 
+	echo "Mono sound encoding was added (encoder: AAC)"
 }
 
 ##############################################################################
@@ -104,7 +105,8 @@ if [[ -d $path ]]; then
 			#echo "input file is $in_path";
 			# Build the command string for running ffmpeg on the
 			# file currently processed
-			command="ffmpeg -loglevel error \
+			#-loglevel error \
+			command="ffmpeg \
 			-y -vsync 0 \
 			-hwaccel cuvid \
 			-hwaccel_output_format cuda \
@@ -112,11 +114,12 @@ if [[ -d $path ]]; then
 			-crop $crop_pat \
 			-i '$in_path' \
 			-filter:v fps=$fps \
-			-c:a copy \
+			-c:a aac \
 			-c:v h264_nvenc \
 			-b:v $v_bitrate \
 			-b:a $a_bitrate \
-			-rc-lookahead 20 \
+			-rc-lookahead 60 \
+			-ac 1 \
 			'$out_path'";
 			# Display the command
 			echo "Command is:"
